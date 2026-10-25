@@ -349,11 +349,22 @@ button{font-family:var(--f-ui)}
   </div>
 </div>
 
+<div class="overlay" id="ovNews" hidden>
+  <div class="card">
+    <div style="font-size:56px;line-height:1">🐹✨</div>
+    <h2>Гру оновлено!</h2>
+    <p>Ми просимо вибачення за всі баги та неполадки.</p>
+    <p class="muted">Тепер є кнопка ↩, щоб скасувати хід, а Сорока на 20-му рівні стала трохи добрішою. Твій прогрес на місці.</p>
+    <p style="font:700 24px/1.2 var(--f-hand);color:var(--berry)">Грай із задоволенням!</p>
+    <button class="btn" id="bNewsOk">Грати</button>
+  </div>
+</div>
+
 <div class="overlay" id="ovGift" hidden>
   <div class="card">
     <div style="font-size:64px;line-height:1">🎁</div>
     <h2>Подарунок дня</h2>
-    <p>Пуф знайшов у нірці <b>+1 місце</b> і <b>+1 підказку</b>.</p>
+    <p>Пуф знайшов у нірці <b>+1 місце</b>, <b>+1 підказку</b> і <b>+1 скасування ходу</b>.</p>
     <p id="giftLine" style="font:700 22px/1.2 var(--f-hand);color:var(--berry)"></p>
     <button class="btn" id="bGiftOk">Дякую!</button>
   </div>
@@ -490,7 +501,7 @@ const TIERS = {
 TIERS.boss={key:'boss',name:'Бос',margin:2,bg:'scene',bands:5,wave:2,minC:12,maxC:30,prob:.85,slots:3,K:4,hidden:true,ice:0,fail:.85,linger:16,span:50,disp:14,decoy:8,tricky:true};
 // One boss closes each chapter. Attacks fire when a set number of cubes has been carried away.
 const BOSSES=[
-  {name:'Сорока Скрекотуха', em:'🐦', atk:['bomb'], about:'Кидає шишки-бомбочки. Віднеси їх, доки не вибухнули!', say:['Тр-р-рісь! Тримай шишку!','Ще одна, хі-хі!','Не встигнеш!']},
+  {name:'Сорока Скрекотуха', em:'🐦', atk:['bomb'], soft:{slots:4,fail:.3,decoy:2,linger:5,disp:6,prob:.5,tricky:false,hidden:false}, nAtk:3, slack:22, about:'Кидає шишки-бомбочки. Віднеси їх, доки не вибухнули!', say:['Тр-р-рісь! Тримай шишку!','Ще одна, хі-хі!','Не встигнеш!']},
   {name:'Слимак Шльоп',    em:'🐌', atk:['mud'],  about:'Обливає кубики слизом. Поки слиз не висохне, їх не віднести.', say:['Шльоп-шльоп!','Липко, правда?','Ще слизу!']},
   {name:'Лис Хитрун',      em:'🦊', atk:['lock','mud'], about:'Замикає стовпчики й бруднить кубики.', say:['Зачинено на обід!','Хитро, так?','Спробуй-но тепер!']},
   {name:'Єнот Ненажера',   em:'🦝', atk:['bomb','mud','lock'], about:'Кидає бомбочки, бруднить кубики й замикає стовпчики.', say:['Ням! Це моє!','Бомбочку хочеш?','Усе з’їм!']},
@@ -692,9 +703,9 @@ function randomFail(cells0,gw,gh,cols0,slots,n){
 const FINAL_ART=ARTS.findIndex(a=>a.name==='Велике серце');
 function makeBoss(boss,order,cols,cells,ice){
   const n=cells.length, atks=[], bombs=[], locks=[], iceT=ice?ice.slice():new Int32Array(n), iceA=new Int32Array(n), mud=new Uint8Array(n);
-  [.12,.26,.4,.54,.68].forEach((f,q)=>{
+  [.12,.26,.4,.54,.68].slice(0,boss.nAtk||5).map((f,q,arr)=>arr.length<5?.15+q*.25:f).forEach((f,q)=>{
     const a=Math.round(n*f), type=boss.atk[q%boss.atk.length], hit=[];
-    if(type==='bomb'){ for(let z=0;z<80;z++){ const k=rnd(n); if(order[k]>a+3&&order[k]<a+n*.2&&!iceT[k]){ bombs.push({k,a,dl:order[k]+10+rnd(8)}); hit.push(k); break; } } }
+    if(type==='bomb'){ for(let z=0;z<80;z++){ const k=rnd(n); if(order[k]>a+3&&order[k]<a+n*.2&&!iceT[k]){ bombs.push({k,a,dl:order[k]+(boss.slack||10)+rnd(8)}); hit.push(k); break; } } }
     if(type==='mud'||type==='freeze'){ for(let z=0;z<120&&hit.length<5;z++){ const k=rnd(n); if(order[k]>a+4&&!iceT[k]){ iceT[k]=Math.max(a+1,order[k]-rnd(3)); iceA[k]=a; if(type==='mud') mud[k]=1; hit.push(k); } } }
     if(type==='lock'){ const col=rnd(cols.length); locks.push({col,a,b:a+10+rnd(10)}); }
     atks.push({a,type,hit});
@@ -715,7 +726,8 @@ function artIndexFor(L){
   const perm=shuffle(pool); R=saveR; return perm[(L-1)%n];
 }
 function buildLevel(L){
-  const tier=tierOf(L); R=seeded(L*7919+17);
+  let tier=tierOf(L); R=seeded(L*7919+17);
+  if(tier.key==='boss'&&bossOf(L).soft) tier={...tier,...bossOf(L).soft};
   const ai=artIndexFor(L), mirror=L>2&&R()<.5;
   const pic=buildPicture(ARTS[ai],tier,mirror), {gw,gh,cells}=pic;
   const TRAPS=['lock','bomb','heavy','mystery','fog'], traps=tier.key==='hard'?shuffle(TRAPS.slice()).slice(0,2):tier.key==='super'?shuffle(TRAPS.slice()).slice(0,3):[];
@@ -749,7 +761,7 @@ function buildLevel(L){
 }
 
 /* ---------- save ---------- */
-let save={level:1,stars:{},seen:false,muted:false,inv:{slot:3,hint:3},giftDay:'',finale:false};
+let save={level:1,stars:{},seen:false,muted:false,inv:{slot:3,hint:3,undo:3},giftDay:'',finale:false};
 try{ const s=JSON.parse(localStorage.getItem('norka-puf-v2')); if(s) save={...save,...s,inv:{...save.inv,...(s.inv||{})}}; }catch(e){}
 const persist=()=>{ try{ localStorage.setItem('norka-puf-v2',JSON.stringify(save)); }catch(e){} };
 const today=()=>new Date().toISOString().slice(0,10);
@@ -781,7 +793,7 @@ function startLevel(lv){
       mystery:['❓ Таємна коробочка','Колір коробочки зі знаком питання дізнаєшся, лише коли візьмеш її.'],
       fog:['🌫️ Туман','Частину картинки сховано. Туман розвіється, коли віднесеш стільки кубиків, скільки написано.']};
     save.trapSeen=save.trapSeen||{}; const newTrap=(d.traps||[]).find(x=>!save.trapSeen[x]);
-    if(!save.benchTip){ save.benchTip=1; persist(); showBanner('🪑 Нове: лавка і ↩','Натисни коробочку біля нірки, щоб пересадити її на лавку. Кнопка ↩ скасовує хід.','',5000); }
+    if(!save.undoTip){ save.undoTip=1; persist(); showBanner('↩ Скасування ходу','Помилилася? Кнопка ↩ внизу поверне останній хід.','',4000); }
     else if(d.boss) showBanner('👑 Бос розділу: '+d.boss.em+' '+d.boss.name,d.boss.about,'boss',4200);
     else if(newTrap){ save.trapSeen[newTrap]=1; persist(); showBanner(TRAP_INFO[newTrap][0],TRAP_INFO[newTrap][1],'',4200); }
     else if(S.iceAt.length&&!save.iceSeen){ save.iceSeen=true; persist(); showBanner('❄️ Крижані кубики','Їх не можна віднести одразу. Число на льоду показує, скільки ще кубиків треба прибрати, щоб лід розтанув.','',4200); }
@@ -807,8 +819,8 @@ function layout(){
   if(!S) return;
   const tile=Math.min(W/7.2,56,H*0.08), gap=tile*0.2, step=tile*0.5;
   const colY=H-(tile*1.15+step*2+tile*0.45);
-  const bt=tile*0.72, benchY=colY-tile*0.42-bt*1.05;
-  const dockY=benchY-tile*0.35-tile*1.1, holeY=dockY-tile*0.6, trayBottom=holeY-tile*0.5;
+  const bt=tile*0.72, benchY=-999;
+  const dockY=colY-tile*0.5-tile*1.1, holeY=dockY-tile*0.6, trayBottom=holeY-tile*0.5;
   const maxW=W-2, maxH=trayBottom-4, ratio=S.gw/S.gh;
   let tw=Math.min(maxW,maxH*ratio), th=tw/ratio; if(th>maxH){th=maxH;tw=th*ratio;}
   const pad=Math.min(tw,th)*0.07+4, cell=Math.min((tw-2*pad)/S.gw,(th-2*pad)/S.gh);
@@ -865,9 +877,11 @@ function snap(){
     dock:S.dock.map(d=>d?{...d}:null),bench:S.bench.map(x=>x?{...x}:null),hams:S.hams.map(h=>({...h})),gold:S.gold,nextAtk:S.nextAtk,slots:S.slots});
   if(S.hist.length>4) S.hist.shift();
 }
+// Each level gives 2 free undos (3 on a boss); after that the saved stock is used.
+const undoLeft=()=>S?S.undo+(save.inv.undo||0):0;
 function undoMove(){
-  if(!S||S.undo<=0||!S.hist.length||(S.state!=='play'&&S.state!=='lose')) return;
-  const h=S.hist.pop(); S.undo--;
+  if(!S||undoLeft()<=0||!S.hist.length||(S.state!=='play'&&S.state!=='lose')) return;
+  const h=S.hist.pop(); if(S.undo>0) S.undo--; else { save.inv.undo--; persist(); }
   Object.assign(S,{cells:h.cells,reserved:h.reserved,eaten:h.eaten,cols:h.cols,dock:h.dock,bench:h.bench,hams:h.hams,gold:h.gold,nextAtk:h.nextAtk,slots:h.slots,
     state:'play',stuckT:0,winT:0,parts:[]});
   S.exp=exposure(S.cells,S.gw,S.gh); S.colShift.fill(0); show('ovLose',false); syncUI(); syncProg();
@@ -964,7 +978,7 @@ function update(dt){
       // moves still possible if boxes are parked on the bench first
       const benchFree=S.bench.filter(x=>!x).length, costs=S.dock.filter(d=>d&&d.phantom==null).map(d=>d.h?2:1).sort((a,b)=>b-a);
       const potential=freeCount()+costs.slice(0,benchFree).reduce((a,b)=>a+b,0);
-      const later=S.cols.some((c,i)=>c.length&&!isLocked(i)&&(c[0].h?2:1)<=potential)||S.bench.some(x=>x&&findTarget(x.col,null)>=0&&(x.h?2:1)<=potential);
+      const later=S.cols.some((c,i)=>c.length&&!isLocked(i)&&(c[0].h?2:1)<=potential);
       if(!later&&!busy&&!can){ S.stuckT+=dt; if(S.stuckT>0.9) lose(); } else S.stuckT=0;
     }
   }
@@ -1053,13 +1067,6 @@ function draw(now){
     ctx.fillStyle='rgba(255,250,241,.55)'; rr(x,p.y,L.tile,L.tile*1.1,L.tile*.24); ctx.fill();
     ctx.strokeStyle='rgba(107,68,40,.25)'; ctx.setLineDash([4,4]); ctx.lineWidth=1.5; rr(x+1,p.y+1,L.tile-2,L.tile*1.1-2,L.tile*.24); ctx.stroke(); ctx.setLineDash([]);
   }
-  { const bw=2*L.bt+L.gap*2, bx=L.benchX-L.gap*1.5, by=L.benchY+L.bt*.55;
-    ctx.fillStyle='#b98654'; rr(bx,by,bw+L.gap*3,L.bt*.5,6); ctx.fill(); ctx.fillStyle='#d6a873'; rr(bx,by,bw+L.gap*3,L.bt*.22,6); ctx.fill();
-    ctx.fillStyle='rgba(74,47,31,.45)'; ctx.font=`800 ${Math.round(L.bt*.26)}px Nunito, system-ui`; ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText('лавка',bx-6,by+L.bt*.25);
-    for(let b=0;b<2;b++){ const p=benchPos(b), x=S.bench[b];
-      if(!x){ ctx.strokeStyle='rgba(107,68,40,.3)'; ctx.setLineDash([3,3]); ctx.lineWidth=1.2; rr(p.x,p.y,L.bt,L.bt,L.bt*.24); ctx.stroke(); ctx.setLineDash([]); continue; }
-      drawTile(p.x,p.y,L.bt,x.col,x.left); drawHam(p.x+L.bt/2,p.y-L.ham*.15,L.ham*.8,x.col,1,0,false,true); } }
   for(let s=0;s<6;s++){ const d=S.dock[s]; if(!d) continue; const p=slotPos(s);
     if(d.phantom!=null){ drawTile(p.x+sh,p.y,L.tile,'e',null,.15); ctx.font=`${Math.round(L.tile*.45)}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#000'; ctx.fillText('⛓️',p.x+sh+L.tile/2,p.y+L.tile*.5); continue; }
     const e=1-Math.pow(1-d.arrive,3);
@@ -1255,8 +1262,6 @@ cv.addEventListener('pointerdown',e=>{
   const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
   for(let c=0;c<S.K;c++){ const p=colPos(c,0);
     if(x>=p.x-6&&x<=p.x+L.tile+6&&y>=p.y-L.ham&&y<=p.y+L.tile*1.2){ tapColumn(c); return; } }
-  for(let s=0;s<S.slots;s++){ const p=slotPos(s); if(S.dock[s]&&x>=p.x&&x<=p.x+L.tile&&y>=p.y-L.ham*.6&&y<=p.y+L.tile*1.1){ const d=S.dock[s]; toBench(d.phantom!=null?d.phantom:s); return; } }
-  for(let b=0;b<2;b++){ const p=benchPos(b); if(x>=p.x-4&&x<=p.x+L.bt+4&&y>=p.y-L.ham*.5&&y<=p.y+L.bt*1.1+4){ fromBench(b); return; } }
   const lp=slotPos(S.maxSlots-1);
   if(S.slots<S.maxSlots&&x>=lp.x&&x<=lp.x+L.tile&&y>=lp.y&&y<=lp.y+L.tile*1.1) useSlotBoost();
 });
@@ -1275,7 +1280,7 @@ function renderHome(){
   $('homePlaySub').textContent=`Рівень ${lv} · ${t.name}`;
   $('chapProg').style.width=(lv>MAX_LEVEL?100:((lv-1)%20)/20*100)+'%';
   if(T3){ T3.setCrown(save.finale); T3.setGround(chapterOf(Math.min(lv,MAX_LEVEL)).deep); T3.resize(); }
-  $('homeInv').textContent=`➕ ${save.inv.slot}   💡 ${save.inv.hint}`;
+  $('homeInv').textContent=`➕ ${save.inv.slot}   💡 ${save.inv.hint}   ↩ ${save.inv.undo||0}`;
   $('tMapSub').textContent=`${Math.min(lv-1,MAX_LEVEL)}/${MAX_LEVEL} · ★${totalStars()}`;
   $('tAlbumSub').textContent=`${albumSet().size}/${ARTS.length}`;
   $('tNotesSub').textContent=`${notesOpen()}/${NOTES.length}`;
@@ -1312,7 +1317,7 @@ function syncUI(){
   $('nSlot').textContent=save.inv.slot; $('bSlot').disabled=save.inv.slot<=0||S.slots>=S.maxSlots;
   $('nShuffle').textContent=save.inv.hint; $('bShuffle').disabled=save.inv.hint<=0;
   $('bLoseSlot').hidden=save.inv.slot<=0||S.slots>=S.maxSlots;
-  $('nUndo').textContent=S.undo; $('bUndo').disabled=S.undo<=0; $('bLoseUndo').hidden=S.undo<=0||!S.hist.length;
+  $('nUndo').textContent=undoLeft(); $('bUndo').disabled=undoLeft()<=0; $('bLoseUndo').hidden=undoLeft()<=0||!S.hist.length;
   syncProg();
 }
 function paintArt(canvas,ai,locked){
@@ -1330,12 +1335,13 @@ function noteHTML(el,idx){
 function win(){
   S.state='win'; const lv=S.L, first=lv===save.level, stars=Math.max(1,3-S.used);
   save.stars[lv]=Math.max(save.stars[lv]||0,stars);
-  if(first){ save.level++; if(S.tier.key==='super'){ save.inv.hint++; save.inv.slot++; } if(S.boss){ save.inv.hint+=2; save.inv.slot+=2; } }
+  if(first){ save.level++; if(S.tier.key==='super'){ save.inv.hint++; save.inv.slot++; save.inv.undo=(save.inv.undo||0)+1; } if(S.boss){ save.inv.hint+=2; save.inv.slot+=2; save.inv.undo=(save.inv.undo||0)+2; }
+    if(lv%5===0&&!S.boss&&S.tier.key!=='super') save.inv.undo=(save.inv.undo||0)+1; }
   persist();
   $('winTitle').textContent=S.boss?S.boss.name+' переможено! 🏆':S.tier.key==='super'?'Супер! Оце так голова!':['Ура!','Розумничка!','Готово!','Яка краса!'][rnd(4)];
   $('winStars').innerHTML=[0,1,2].map(i=>`<b class="${i<stars?'on':''}">★</b>`).join('');
   paintArt($('winArt'),S.artIndex);
-  $('winText').textContent=`«${ARTS[S.artIndex].name}» в альбомі Пуфа.`+(first&&S.boss?' Нагорода за боса: +2 місця і +2 підказки!':first&&S.tier.key==='super'?' Нагорода: +1 місце і +1 підказка.':'');
+  $('winText').textContent=`«${ARTS[S.artIndex].name}» в альбомі Пуфа.`+(first&&S.boss?' Нагорода за боса: +2 місця, +2 підказки і +2 скасування!':first&&S.tier.key==='super'?' Нагорода: +1 місце, +1 підказка і +1 скасування.':first&&lv%5===0?' Бонус: +1 скасування ходу.':'');
   const note=$('winNote');
   if(first&&lv%3===0&&lv/3<=NOTES.length){ noteHTML(note,lv/3-1); note.hidden=false; } else note.hidden=true;
   $('bNext').textContent=lv+1<=save.level?'Далі':'Ще раз';
@@ -1370,7 +1376,7 @@ $('bPlay').onclick=()=>{ initAudio(); startLevel(save.level); };
 $('tMap').onclick=()=>go('map'); $('mapBack').onclick=()=>go('home');
 $('tAlbum').onclick=openAlbum; $('bAlbumClose').onclick=()=>show('ovAlbum',false);
 $('tNotes').onclick=openNotes; $('bNotesClose').onclick=()=>show('ovNotes',false); $('bNoteClose').onclick=()=>show('ovNote',false);
-$('bGift').onclick=()=>{ save.giftDay=today(); save.inv.slot++; save.inv.hint++; persist();
+$('bGift').onclick=()=>{ save.giftDay=today(); save.inv.slot++; save.inv.hint++; save.inv.undo=(save.inv.undo||0)+1; persist();
   $('giftLine').textContent=GIFT_LINES[rnd(GIFT_LINES.length)]; show('ovGift',true); blip(880,.15,'triangle',.06); };
 $('bGiftOk').onclick=()=>{ show('ovGift',false); renderHome(); };
 $('bFinaleOk').onclick=()=>{ finRun=false; show('ovFinale',false); show('ovWin',false); go('home'); };
@@ -1471,7 +1477,9 @@ if(!save.seen&&$('ovIntro').hidden){
   const main=ctx; ctx=ic.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
   cube(14,78,22,PAL.r); cube(36,78,22,PAL.p); cube(25,56,22,PAL.y); drawHam(104,74,66,'n',-1,0.3,false);
   ctx=main; show('ovIntro',true);
-}}
+} else if(!save.notice4&&$('ovIntro').hidden){ save.notice4=1; persist(); show('ovNews',true); }}
+$('bNewsOk').onclick=()=>{ show('ovNews',false); renderHome(); };
+if(!save.v4){ save.v4=1; if(save.level<20) save.level=20; save.seen=true; persist(); }
 if(!standalone&&!save.installSeen) openInstall(); else maybeIntro();
 window.__t={toBench:s=>toBench(s),undoMove:()=>undoMove()}; window.__norka={verify(L){ const d=buildLevel(L); SIM_ICE=d.ice; SIM_LOCK=d.lock; SIM_BOMBS=d.bombs; if(d.boss){ SIM_ICEA=d.boss.iceA; SIM_LOCKS2=d.boss.locks; } const g=greedyWins(d.cells,d.gw,d.gh,d.cols,d.tier.slots);
   const ok=g||searchWins(d.cells,d.gw,d.gh,d.cols,d.tier.slots,30000); const fr=randomFail(d.cells,d.gw,d.gh,d.cols,d.tier.slots,40); SIM_ICE=null; SIM_LOCK=null; SIM_BOMBS=null; SIM_ICEA=null; SIM_LOCKS2=null;
